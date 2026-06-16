@@ -36,15 +36,15 @@ export type { SyncOperation } from './manual-sync'
 // Schema output type inference helper (matches electric.ts pattern)
 type InferSchemaOutput<T> = T extends StandardSchemaV1
   ? StandardSchemaV1.InferOutput<T> extends object
-    ? StandardSchemaV1.InferOutput<T>
-    : Record<string, unknown>
+  ? StandardSchemaV1.InferOutput<T>
+  : Record<string, unknown>
   : Record<string, unknown>
 
 // Schema input type inference helper (matches electric.ts pattern)
 type InferSchemaInput<T> = T extends StandardSchemaV1
   ? StandardSchemaV1.InferInput<T> extends object
-    ? StandardSchemaV1.InferInput<T>
-    : Record<string, unknown>
+  ? StandardSchemaV1.InferInput<T>
+  : Record<string, unknown>
   : Record<string, unknown>
 
 type TQueryKeyBuilder<TQueryKey> = (opts: LoadSubsetOptions) => TQueryKey
@@ -75,8 +75,8 @@ export interface QueryCollectionConfig<
   queryFn: TQueryFn extends (
     context: QueryFunctionContext<TQueryKey>,
   ) => Promise<Array<any>> | Array<any>
-    ? (context: QueryFunctionContext<TQueryKey>) => Promise<Array<T>> | Array<T>
-    : TQueryFn
+  ? (context: QueryFunctionContext<TQueryKey>) => Promise<Array<T>> | Array<T>
+  : TQueryFn
   /* Function that extracts array items from wrapped API responses (e.g metadata, pagination)  */
   select?: (data: TQueryData) => Array<T>
   /** The TanStack Query client instance */
@@ -230,14 +230,14 @@ interface QueryCollectionState {
 
 type PersistedQueryRetentionEntry =
   | {
-      queryHash: string
-      mode: `ttl`
-      expiresAt: number
-    }
+    queryHash: string
+    mode: `ttl`
+    expiresAt: number
+  }
   | {
-      queryHash: string
-      mode: `until-revalidated`
-    }
+    queryHash: string
+    mode: `until-revalidated`
+  }
 
 const QUERY_COLLECTION_GC_PREFIX = `queryCollection:gc:`
 
@@ -619,8 +619,8 @@ export function queryCollectionOptions(
     if (!isValidPrefix) {
       console.warn(
         `[QueryCollection] queryKey function must return keys that extend the base key prefix. ` +
-          `Base: ${JSON.stringify(baseKey)}, Got: ${JSON.stringify(key)}. ` +
-          `This can cause stale cache issues.`,
+        `Base: ${JSON.stringify(baseKey)}, Got: ${JSON.stringify(key)}. ` +
+        `This can cause stale cache issues.`,
       )
     }
   }
@@ -1067,16 +1067,16 @@ export function queryCollectionOptions(
     const startupRetentionMaintenancePromise =
       !startupRetentionEntries || startupRetentionEntries.length === 0
         ? (() => {
-            startupRetentionSettled = true
-            return Promise.resolve()
-          })()
+          startupRetentionSettled = true
+          return Promise.resolve()
+        })()
         : runPersistedRetentionMaintenance(async () => {
-            try {
-              await consumePersistedQueryRetentionAtStartup()
-            } finally {
-              startupRetentionSettled = true
-            }
-          })
+          try {
+            await consumePersistedQueryRetentionAtStartup()
+          } finally {
+            startupRetentionSettled = true
+          }
+        })
 
     const createQueryFromOpts = (
       opts: LoadSubsetOptions = {},
@@ -1324,8 +1324,12 @@ export function queryCollectionOptions(
           setPersistedOwners(key, owners)
         }
         addRow(key, hashedQueryKey)
-        if (!currentSyncedItems.has(key)) {
-          write({ type: `insert`, value: newItem })
+        const existingItem = currentSyncedItems.get(key);
+        console.log('Existing item for key', key, existingItem);
+        if (!existingItem) {
+          write({ type: `insert`, value: newItem });
+        } else if (!previouslyOwnedRows.has(key) && !deepEquals(existingItem, newItem)) {
+          write({ type: `update`, value: newItem });
         }
       })
 
@@ -1894,44 +1898,44 @@ export function queryCollectionOptions(
   // Create wrapper handlers for direct persistence operations that handle refetching
   const wrappedOnInsert = onInsert
     ? async (params: InsertMutationFnParams<any>) => {
-        const handlerResult = (await onInsert(params)) ?? {}
-        const shouldRefetch =
-          (handlerResult as { refetch?: boolean }).refetch !== false
+      const handlerResult = (await onInsert(params)) ?? {}
+      const shouldRefetch =
+        (handlerResult as { refetch?: boolean }).refetch !== false
 
-        if (shouldRefetch) {
-          await refetch()
-        }
-
-        return handlerResult
+      if (shouldRefetch) {
+        await refetch()
       }
+
+      return handlerResult
+    }
     : undefined
 
   const wrappedOnUpdate = onUpdate
     ? async (params: UpdateMutationFnParams<any>) => {
-        const handlerResult = (await onUpdate(params)) ?? {}
-        const shouldRefetch =
-          (handlerResult as { refetch?: boolean }).refetch !== false
+      const handlerResult = (await onUpdate(params)) ?? {}
+      const shouldRefetch =
+        (handlerResult as { refetch?: boolean }).refetch !== false
 
-        if (shouldRefetch) {
-          await refetch()
-        }
-
-        return handlerResult
+      if (shouldRefetch) {
+        await refetch()
       }
+
+      return handlerResult
+    }
     : undefined
 
   const wrappedOnDelete = onDelete
     ? async (params: DeleteMutationFnParams<any>) => {
-        const handlerResult = (await onDelete(params)) ?? {}
-        const shouldRefetch =
-          (handlerResult as { refetch?: boolean }).refetch !== false
+      const handlerResult = (await onDelete(params)) ?? {}
+      const shouldRefetch =
+        (handlerResult as { refetch?: boolean }).refetch !== false
 
-        if (shouldRefetch) {
-          await refetch()
-        }
-
-        return handlerResult
+      if (shouldRefetch) {
+        await refetch()
       }
+
+      return handlerResult
+    }
     : undefined
 
   // Create utils instance with state and dependencies passed explicitly

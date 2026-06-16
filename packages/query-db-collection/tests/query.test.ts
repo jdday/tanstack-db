@@ -8,6 +8,7 @@ import {
   ilike,
   inArray,
   or,
+  parseWhereExpression,
 } from '@tanstack/db'
 import { stripVirtualProps } from '../../db/tests/utils'
 import { persistedCollectionOptions } from '../../db-sqlite-persistence-core/src'
@@ -155,7 +156,7 @@ function createPersistedQueryAdapter<TItem extends { id: string }>(
         }
       }
     },
-    ensureIndex: async () => {},
+    ensureIndex: async () => { },
   }
 }
 
@@ -305,6 +306,10 @@ describe(`QueryCollection`, () => {
     expect(stripVirtualProps(collection.get(`4`))).toEqual(item4)
   })
 
+  it("should update existing items when moving between loadSubset queries", async () => {
+
+  })
+
   it(`should handle query errors gracefully`, async () => {
     const queryKey = [`errorItems`]
     const testError = new Error(`Test query error`)
@@ -313,7 +318,7 @@ describe(`QueryCollection`, () => {
     // Mock console.error to verify it's called with our error
     const consoleErrorSpy = vi
       .spyOn(console, `error`)
-      .mockImplementation(() => {})
+      .mockImplementation(() => { })
 
     const queryFn: (
       context: QueryFunctionContext<any>,
@@ -366,7 +371,7 @@ describe(`QueryCollection`, () => {
     const queryKey = [`invalidData`]
     const consoleErrorSpy = vi
       .spyOn(console, `error`)
-      .mockImplementation(() => {})
+      .mockImplementation(() => { })
 
     // Mock queryFn to return invalid data (not an array of objects)
     const queryFn: (
@@ -757,7 +762,7 @@ describe(`QueryCollection`, () => {
       const queryKey = [`select-test`]
       const consoleErrorSpy = vi
         .spyOn(console, `error`)
-        .mockImplementation(() => {})
+        .mockImplementation(() => { })
 
       const queryFn = vi.fn().mockResolvedValue(initialMetaData)
       // Returns non-array
@@ -829,7 +834,7 @@ describe(`QueryCollection`, () => {
       const queryKey = [`select-writeInsert-test`]
       const consoleErrorSpy = vi
         .spyOn(console, `error`)
-        .mockImplementation(() => {})
+        .mockImplementation(() => { })
 
       const queryFn = vi.fn().mockResolvedValue(initialMetaData)
       const select = vi.fn((data: MetaDataType<TestItem>) => data.data)
@@ -877,7 +882,7 @@ describe(`QueryCollection`, () => {
       const queryKey = [`select-writeUpsert-test`]
       const consoleErrorSpy = vi
         .spyOn(console, `error`)
-        .mockImplementation(() => {})
+        .mockImplementation(() => { })
 
       const queryFn = vi.fn().mockResolvedValue(initialMetaData)
       const select = vi.fn((data: MetaDataType<TestItem>) => data.data)
@@ -1292,8 +1297,8 @@ describe(`QueryCollection`, () => {
       expect(collection.status).toBe(`ready`)
 
       // Add explicit subscribers to test cleanup with active subscribers
-      const subscription1 = collection.subscribeChanges(() => {})
-      const subscription2 = collection.subscribeChanges(() => {})
+      const subscription1 = collection.subscribeChanges(() => { })
+      const subscription2 = collection.subscribeChanges(() => { })
       expect(collection.subscriberCount).toBe(2)
 
       // Cleanup the collection which should trigger sync cleanup
@@ -1345,8 +1350,8 @@ describe(`QueryCollection`, () => {
       })
 
       // Add subscribers to test consistency during multiple cleanups
-      const subscription1 = collection.subscribeChanges(() => {})
-      const subscription2 = collection.subscribeChanges(() => {})
+      const subscription1 = collection.subscribeChanges(() => { })
+      const subscription2 = collection.subscribeChanges(() => { })
       expect(collection.subscriberCount).toBe(2)
 
       // Call cleanup multiple times - subscriber count should remain consistent
@@ -1395,7 +1400,7 @@ describe(`QueryCollection`, () => {
       expect(collection.subscriberCount).toBe(0) // startSync: true with no explicit subscribers
 
       // Add a subscriber before cleanup
-      const preCleanupSubscription = collection.subscribeChanges(() => {})
+      const preCleanupSubscription = collection.subscribeChanges(() => { })
       expect(collection.subscriberCount).toBe(1)
 
       // Cleanup - should handle active subscribers gracefully
@@ -1408,7 +1413,7 @@ describe(`QueryCollection`, () => {
       expect(collection.subscriberCount).toBe(0)
 
       // Access collection data to restart sync with new subscriber
-      const postCleanupSubscription = collection.subscribeChanges(() => {})
+      const postCleanupSubscription = collection.subscribeChanges(() => { })
       expect(collection.subscriberCount).toBe(1) // Subscriber count tracking works after restart
 
       // Should restart sync (might be ready immediately if query is cached)
@@ -1463,7 +1468,7 @@ describe(`QueryCollection`, () => {
       removeQueriesSpy.mockClear()
 
       // Restart by accessing collection
-      const subscription = collection.subscribeChanges(() => {})
+      const subscription = collection.subscribeChanges(() => { })
 
       // Should restart sync
       expect([`loading`, `ready`]).toContain(collection.status)
@@ -1809,7 +1814,7 @@ describe(`QueryCollection`, () => {
       expect(collection2.status).toBe(`idle`) // Inactive due to startSync: false + no subscribers
 
       // Add subscriber to collection2 -> should now activate
-      const subscription = collection2.subscribeChanges(() => {})
+      const subscription = collection2.subscribeChanges(() => { })
 
       await vi.waitFor(() => expect(collection2.status).toBe(`ready`))
 
@@ -2728,7 +2733,7 @@ describe(`QueryCollection`, () => {
       expect(collection.status).toBe(`idle`)
 
       // Add a subscriber -> should subscribe and load data
-      const subscription1 = collection.subscribeChanges(() => {})
+      const subscription1 = collection.subscribeChanges(() => { })
 
       await vi.waitFor(() => {
         expect(collection.status).toBe(`ready`)
@@ -2739,7 +2744,7 @@ describe(`QueryCollection`, () => {
 
       // Add another subscriber - should not trigger additional queries
       const initialCallCount = queryFn.mock.calls.length
-      const subscription2 = collection.subscribeChanges(() => {})
+      const subscription2 = collection.subscribeChanges(() => { })
       expect(collection.subscriberCount).toBe(2)
 
       await flushPromises()
@@ -4103,20 +4108,20 @@ describe(`QueryCollection`, () => {
       })
 
       const config: QueryCollectionConfig<TestItem & { category: `A` | `B` }> =
-        {
-          id: `empty-test`,
-          queryClient,
-          queryKey: (ctx) => {
-            if (ctx.where) {
-              return [...baseQueryKey, ctx.where]
-            }
-            return baseQueryKey
-          },
-          queryFn,
-          getKey,
-          startSync: true,
-          syncMode: `on-demand`,
-        }
+      {
+        id: `empty-test`,
+        queryClient,
+        queryKey: (ctx) => {
+          if (ctx.where) {
+            return [...baseQueryKey, ctx.where]
+          }
+          return baseQueryKey
+        },
+        queryFn,
+        getKey,
+        startSync: true,
+        syncMode: `on-demand`,
+      }
 
       const options = queryCollectionOptions(config)
       const collection = createCollection(options)
@@ -4418,6 +4423,126 @@ describe(`QueryCollection`, () => {
       // Wait for final GC to process
       await vi.waitFor(() => {
         expect(collection.size).toBe(0)
+      })
+    })
+
+    it(`should handle updated subsets transition ownership udpate row`, async () => {
+      // This test catches issues where a row is updated to have a new parent, meaning it transitions between active live queries
+
+      const baseQueryKey = [`row-ownership-bug-test`]
+      const items: Array<CategorisedItem> = [
+        { id: `1`, name: `Item 1`, category: `A` },
+        { id: `2`, name: `Item 2`, category: `B` },
+        { id: `3`, name: `Item 3`, category: `B` },
+      ]
+
+      async function updateItem(id: string, changes: Partial<CategorisedItem>) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        const todo = items.find((t) => t.id === id)
+        if (todo) {
+          Object.assign(todo, changes)
+        }
+        return todo
+      }
+
+      const config: QueryCollectionConfig<CategorisedItem> = {
+        id: `row-ownership-bug-test`,
+        queryClient,
+        queryKey: baseQueryKey,
+        queryFn: ({ meta }) => {
+          const where = meta?.loadSubsetOptions?.where;
+
+          if (!where) {
+            return Promise.resolve(items);
+          }
+          const parsedWhere = parseWhereExpression(where, {
+            handlers: {
+              eq: (field, value) => {
+                return { type: `eq`, field, value };
+              },
+            }
+          });
+
+          let filteredItems = [...items];
+
+          if (parsedWhere?.type === 'eq') {
+            const propName = Array.isArray(parsedWhere.field)
+              ? parsedWhere.field[parsedWhere.field.length - 1]
+              : parsedWhere.field;
+
+            filteredItems = filteredItems.filter(item => item[propName as keyof typeof item] === parsedWhere.value);
+          }
+
+          return Promise.resolve(filteredItems);
+        },
+        getKey: (item) => item.id,
+        startSync: true,
+        syncMode: `on-demand`,
+        onUpdate: async ({ transaction }) => {
+
+          const updates = transaction.mutations.map((m) => ({
+            id: m.key as string,
+            changes: m.changes,
+          }))
+
+          await Promise.all(
+            updates.map((update) => updateItem(update.id, update.changes)),
+          )
+
+          // bug was happening when refect was enabled, previous ownership of row was being retained in live queries
+          // even if refetch returns valid results
+          return { refetch: true }
+        }
+      }
+
+      const options = queryCollectionOptions(config)
+      const collection = createCollection(options)
+
+      // Create two live queries that request the SAME subset
+      const query1 = createLiveQueryCollection({
+        query: (q) =>
+          q
+            .from({ item: collection })
+            .where(({ item }) => eq(item.category, `A`))
+            .select(({ item }) => ({ id: item.id, name: item.name })),
+      })
+
+      const query2 = createLiveQueryCollection({
+        query: (q) =>
+          q
+            .from({ item: collection })
+            .where(({ item }) => eq(item.category, `B`))
+            .select(({ item }) => ({ id: item.id, name: item.name })),
+      })
+
+      // Load both queries
+      await query1.preload()
+      await query2.preload()
+
+      // Wait for data to load
+      await vi.waitFor(() => {
+        expect(collection.size).toBe(3)
+      })
+
+      expect(query1.state.size).toBe(1)
+      expect(query2.state.size).toBe(2)
+
+      collection.update(`1`, (draft) => {
+        draft.category = `C`
+      })
+
+      await vi.waitFor(() => {
+        // optimistic update works immediately with optimistic updates
+        expect(query1.state.size).toBe(0) // query1 should no longer have item 1
+        expect(query2.state.size).toBe(3) // query2 should now have items 1 and 2
+      })
+
+      // Wait for onUpdate triggered refetch to finish and update the queries
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      await vi.waitFor(() => {
+        expect(query1.state.size).toBe(0) // should still be 0
+        expect(query2.state.size).toBe(3) // should still be 3
       })
     })
 
@@ -5036,10 +5161,10 @@ describe(`QueryCollection`, () => {
           `queryCollection:gc:${retainedQueryHash}`,
         ) as
           | {
-              queryHash: string
-              mode: `ttl` | `until-revalidated`
-              expiresAt?: number
-            }
+            queryHash: string
+            mode: `ttl` | `until-revalidated`
+            expiresAt?: number
+          }
           | undefined
 
         expect(retentionEntry).toEqual({
@@ -5140,10 +5265,10 @@ describe(`QueryCollection`, () => {
           `queryCollection:gc:${retainedQueryHash}`,
         ) as
           | {
-              queryHash: string
-              mode: `ttl` | `until-revalidated`
-              expiresAt?: number
-            }
+            queryHash: string
+            mode: `ttl` | `until-revalidated`
+            expiresAt?: number
+          }
           | undefined
 
         if (resolvedQueryGcTime === Number.POSITIVE_INFINITY) {
