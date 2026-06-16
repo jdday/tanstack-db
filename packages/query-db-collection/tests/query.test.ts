@@ -4440,7 +4440,7 @@ describe(`QueryCollection`, () => {
         await new Promise((resolve) => setTimeout(resolve, 10))
         const todo = items.find((t) => t.id === id)
         if (todo) {
-          Object.assign(todo, changes)
+          Object.assign(todo, { ...changes, name: "server name" })
         }
         return todo
       }
@@ -4450,6 +4450,8 @@ describe(`QueryCollection`, () => {
         queryClient,
         queryKey: baseQueryKey,
         queryFn: ({ meta }) => {
+
+
           const where = meta?.loadSubsetOptions?.where;
 
           if (!where) {
@@ -4473,7 +4475,7 @@ describe(`QueryCollection`, () => {
             filteredItems = filteredItems.filter(item => item[propName as keyof typeof item] === parsedWhere.value);
           }
 
-          return Promise.resolve(filteredItems);
+          return Promise.resolve([...filteredItems]);
         },
         getKey: (item) => item.id,
         startSync: true,
@@ -4484,6 +4486,8 @@ describe(`QueryCollection`, () => {
             id: m.key as string,
             changes: m.changes,
           }))
+
+          console.log(updates)
 
           await Promise.all(
             updates.map((update) => updateItem(update.id, update.changes)),
@@ -4504,7 +4508,7 @@ describe(`QueryCollection`, () => {
           q
             .from({ item: collection })
             .where(({ item }) => eq(item.category, `A`))
-            .select(({ item }) => ({ id: item.id, name: item.name })),
+
       })
 
       const query2 = createLiveQueryCollection({
@@ -4512,7 +4516,6 @@ describe(`QueryCollection`, () => {
           q
             .from({ item: collection })
             .where(({ item }) => eq(item.category, `B`))
-            .select(({ item }) => ({ id: item.id, name: item.name })),
       })
 
       // Load both queries
@@ -4528,21 +4531,26 @@ describe(`QueryCollection`, () => {
       expect(query2.state.size).toBe(2)
 
       collection.update(`1`, (draft) => {
-        draft.category = `C`
+        draft.category = `B`
       })
 
-      await vi.waitFor(() => {
-        // optimistic update works immediately with optimistic updates
-        expect(query1.state.size).toBe(0) // query1 should no longer have item 1
-        expect(query2.state.size).toBe(3) // query2 should now have items 1 and 2
-      })
+      // optimistic update works immediately with optimistic updates
+      expect(query1.state.size).toBe(0) // query1 should no longer have item 1
+      expect(query2.state.size).toBe(3) // query2 should now have items 1 and 2
+      const updatedRow = query2.state.get(`1`)
+      expect(updatedRow).toBeDefined()
+      expect(updatedRow?.category).toBe(`B`)
+      expect(updatedRow?.name).toBe(`Item 1`) // Optimistic update should still have the old name until refetch completes
 
       // Wait for onUpdate triggered refetch to finish and update the queries
-      await new Promise((resolve) => setTimeout(resolve, 50))
-
       await vi.waitFor(() => {
         expect(query1.state.size).toBe(0) // should still be 0
         expect(query2.state.size).toBe(3) // should still be 3
+
+        const updatedRow = query2.state.get(`1`)
+        expect(updatedRow).toBeDefined()
+        expect(updatedRow?.category).toBe(`B`)
+        expect(updatedRow?.name).toBe(`server name`) // Refetch should have updated the name to the server value
       })
     })
 

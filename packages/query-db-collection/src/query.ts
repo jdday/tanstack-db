@@ -1328,7 +1328,7 @@ export function queryCollectionOptions(
         console.log('Existing item for key', key, existingItem);
         if (!existingItem) {
           write({ type: `insert`, value: newItem });
-        } else if (!previouslyOwnedRows.has(key) && !deepEquals(existingItem, newItem)) {
+        } else if (!previouslyOwnedRows.has(key)) {
           write({ type: `update`, value: newItem });
         }
       })
