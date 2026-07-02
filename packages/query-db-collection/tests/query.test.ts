@@ -6576,4 +6576,97 @@ describe(`QueryCollection`, () => {
       customQueryClient.clear()
     })
   })
+
+  describe(`live query deps change does not drop sibling record`, () => {
+    it(`should retain item 1 in list live query when detail live query swaps from id=1 to id=2`, async () => {
+      // Reproduces: detail useLiveQuery has id in deps array.
+      // When id changes 1→2, the old lq (id=1) is GC'd.
+      // That should NOT drop item 1 from the list lq (where active=true).
+
+      type ActiveItem = { id: string; name: string; active: boolean }
+      const items: Array<ActiveItem> = [
+        { id: `1`, name: `Item 1`, active: true },
+        { id: `2`, name: `Item 2`, active: true },
+        { id: `3`, name: `Item 3`, active: true },
+      ]
+
+      const queryFn = vi.fn().mockImplementation((ctx: QueryFunctionContext<any>) => {
+        const where = ctx.meta?.loadSubsetOptions?.where as any
+        if (!where) return Promise.resolve(items)
+        if (where.name === `eq` && where.args?.[0]?.path?.[0] === `id`) {
+          const id = where.args[1]?.value
+          return Promise.resolve(items.filter((i) => i.id === id))
+        }
+        if (where.name === `eq` && where.args?.[0]?.path?.[0] === `active`) {
+          const active = where.args[1]?.value
+          return Promise.resolve(items.filter((i) => i.active === active))
+        }
+        return Promise.resolve(items)
+      })
+
+      const source = createCollection(
+        queryCollectionOptions({
+          id: `swap-id-test`,
+          queryClient,
+          queryKey: [`swap-id-test`],
+          queryFn,
+          getKey: (item: ActiveItem) => item.id,
+          syncMode: `on-demand`,
+        }),
+      )
+
+      // List view: all active items — stays mounted throughout
+      const lq1 = createLiveQueryCollection({
+        query: (q) =>
+          q
+            .from({ item: source })
+            .where(({ item }) => eq((item as any).active, true)),
+        gcTime: 1,
+      })
+
+      // Detail view: id=1 — simulates first render
+      const lqDetail1 = createLiveQueryCollection({
+        query: (q) =>
+          q
+            .from({ item: source })
+            .where(({ item }) => eq(item.id, `1`))
+            .findOne(),
+        gcTime: 1,
+      })
+
+      const sub1 = lq1.subscribeChanges(() => {})
+      const subDetail1 = lqDetail1.subscribeChanges(() => {})
+
+      await vi.waitFor(() => {
+        expect(lq1.size).toBe(3)
+        expect(lqDetail1.size).toBe(1)
+      })
+
+      // Simulate deps change: id changes 1→2
+      // Old detail collection (id=1) is abandoned, new one (id=2) created
+      const lqDetail2 = createLiveQueryCollection({
+        query: (q) =>
+          q
+            .from({ item: source })
+            .where(({ item }) => eq(item.id, `2`))
+            .findOne(),
+        gcTime: 1,
+      })
+      const subDetail2 = lqDetail2.subscribeChanges(() => {})
+      subDetail1.unsubscribe() // old detail subscription dropped
+
+      await vi.waitFor(() => expect(lqDetail2.size).toBe(1))
+
+      // Wait for old detail collection GC to fire
+      await vi.waitFor(() => expect(lqDetail1.status).toBe(`cleaned-up`), { timeout: 500 })
+      await flushPromises()
+
+      // List view must still contain item 1
+      expect(lq1.size).toBe(3)
+      expect(lq1.state.get(`1`)).toBeDefined()
+
+      sub1.unsubscribe()
+      subDetail2.unsubscribe()
+    })
+  })
 })
